@@ -18,8 +18,13 @@ import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.Image;
 import android.media.MediaPlayer;
 import android.media.SoundPool;
 import android.os.Build;
@@ -28,14 +33,18 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
+import android.view.animation.RotateAnimation;
 import android.view.animation.ScaleAnimation;
 import android.widget.Button;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.Interpreter;
@@ -68,7 +77,7 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class GameActivity extends AppCompatActivity {
+public class GameActivity extends AppCompatActivity implements SensorEventListener {
     Intent music_intent;
     MediaPlayer mp=null;
     SQLiteDatabase db;
@@ -82,6 +91,8 @@ public class GameActivity extends AppCompatActivity {
     int startTime;
     Bitmap scaled;
     ObjectAnimator scaleDown;
+    SensorManager sm=null;
+    Sensor s;
 
     protected Interpreter tflite;
     private MappedByteBuffer tfliteModel;
@@ -102,7 +113,9 @@ public class GameActivity extends AppCompatActivity {
         remaining=new ArrayList<Integer>();
         for(int i=0;i<26;i++) remaining.add(i);
         db = this.openOrCreateDatabase ("myDatabase", Context.MODE_PRIVATE, null);
-
+        sm = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        s = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        sm.registerListener(this, s, 1000000);
         inflatedView = getLayoutInflater().inflate(R.layout.activity_game, null);
         LinearLayout gameView= (LinearLayout)  inflatedView.findViewById(R.id.game_view);
         GridLayout grid = (GridLayout) inflatedView.findViewById(R.id.grid);
@@ -153,6 +166,9 @@ public class GameActivity extends AppCompatActivity {
                                       });
             btn.setClickable(false);
 
+            ImageView iv=new ImageView(this);
+            iv.setId(i+100);
+
             TextView tv=new TextView(this);
             tv.setText(String.valueOf((char)('A'+i)));
             tv.setTextColor(Color.parseColor("#6200EE"));
@@ -160,6 +176,7 @@ public class GameActivity extends AppCompatActivity {
             tv.setId(1000+i);
 
             ll.addView(btn);
+            ll.addView(iv);
             ll.addView(tv);
             grid.addView(ll);
         }
@@ -167,7 +184,7 @@ public class GameActivity extends AppCompatActivity {
 
     private void selectRandomButton(int x1){
         Random random=new Random();
-        if (x1==0) currentIndex = 12;
+        if (x1==0) currentIndex = 1;
         else currentIndex=random.nextInt(remaining.size());
         current=remaining.get(currentIndex);
         currentButton=(Button) inflatedView.findViewById(current);
@@ -175,12 +192,12 @@ public class GameActivity extends AppCompatActivity {
         currentButton.setClickable(true);
         currentButton.setBackgroundColor(Color.parseColor("#94E78D"));
 
-//        ScaleAnimation scale=new ScaleAnimation(1,0.5f,1,0.5f,.5f,.5f);
-//        scale.setDuration(1000);
-//        scale.setRepeatMode(Animation.REVERSE);
-//        scale.setRepeatCount(Animation.INFINITE);
-//        currentButton.setAnimation(scale);
-//        scale.start();
+//        scaleDown = ObjectAnimator.ofFloat(currentButton, "rotationY", 0.0f, 360f);
+//        scaleDown.setDuration(3600);
+//        scaleDown.setRepeatCount(ObjectAnimator.INFINITE);
+//        scaleDown.setInterpolator(new AccelerateDecelerateInterpolator());
+//        scaleDown.start();
+
 
         scaleDown = ObjectAnimator.ofPropertyValuesHolder(
                 currentButton,
@@ -190,30 +207,7 @@ public class GameActivity extends AppCompatActivity {
         scaleDown.setDuration(1000);
         scaleDown.setRepeatCount(ValueAnimator.INFINITE);
         scaleDown.setRepeatMode(ValueAnimator.REVERSE);
-        scaleDown.addListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animator) {
-                currentButton.setWidth(200);
-                currentButton.setHeight(200);
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animator) {
-
-            }
-        });
         scaleDown.start();
-
 
 //        blinkanimation= new AlphaAnimation(1, 0);
 //        blinkanimation.setDuration(1000);
@@ -241,12 +235,7 @@ public class GameActivity extends AppCompatActivity {
         if(requestCode==1 && resultCode==RESULT_OK){
             Bundle extras=data.getExtras();
             Bitmap imageBitmap=(Bitmap) extras.get("data");
-            scaled=Bitmap.createScaledBitmap(imageBitmap,200,200,false);
-            //Log.v("mytag","Image H: "+scaled.getHeight()+" W: "+scaled.getWidth());
-//            scaleDown.cancel();
-//            currentButton.setWidth(200);
-//            currentButton.setHeight(200);
-            //Log.v("mytag","Button H: "+currentButton.getHeight()+" W: "+currentButton.getWidth());
+            scaled=Bitmap.createScaledBitmap(imageBitmap,180,180,false);
 
             inputImageBuffer = loadImage(imageBitmap);
             tflite.run(inputImageBuffer.getBuffer(),outputProbabilityBuffer.getBuffer().rewind());
@@ -328,57 +317,83 @@ public class GameActivity extends AppCompatActivity {
                 return (o2.getValue()).compareTo(o1.getValue());
             }
         });
-        for(int i=0;i<3;i++){
-            if(list.get(i).getValue()>0){
-                Log.v("mytag","key :"+list.get(i).getKey()+" Probability :"+list.get(i).getValue());
-                //Log.v("mytag","1"+list.get(i).getKey().toUpperCase().charAt(0)+"2"+(char)('A'+current));
-                if(list.get(i).getKey().toUpperCase().charAt(0)==(char)('A'+current)){
-                    //Log.v("mytag","removed"+remaining.get(currentIndex));
-                    //Database update
-                    String l=String.valueOf((char)('A'+current));
-                    db.execSQL("update BarChart set count=count+1 where letter='"+l+"';");
-                    db.execSQL("update BarChart set time=time+"+String.valueOf(startTime)+" where letter='"+l+"';");
+        String detection="Detected object: ";
+        if(detectFake(list)){
+            detection+="Virtual object";
+        }
+        else {
+            for (int i = 0; i < 3; i++) {
+                if (list.get(i).getValue() > 0) {
+                    Log.v("mytag", "key :" + list.get(i).getKey() + " Probability :" + list.get(i).getValue());
+                    //Log.v("mytag","1"+list.get(i).getKey().toUpperCase().charAt(0)+"2"+(char)('A'+current));
+                    if (list.get(i).getKey().toUpperCase().charAt(0) == (char) ('A' + current)) {
+                        //Log.v("mytag","removed"+remaining.get(currentIndex));
+                        //Database update
+                        //Toast.makeText(getApplicationContext(),list.get(i).getKey(),Toast.LENGTH_SHORT).show();
+                        TextView tv = (TextView) findViewById(R.id.detected_object);
+                        tv.setText("Detected object: " + list.get(i).getKey());
+                        String l = String.valueOf((char) ('A' + current));
+                        db.execSQL("update BarChart set count=count+1 where letter='" + l + "';");
+                        db.execSQL("update BarChart set time=time+" + String.valueOf(startTime) + " where letter='" + l + "';");
 
-                    ContentValues cv = new ContentValues();
-                    cv.put("letter",l);
-                    cv.put("label",list.get(i).getKey());
-                    cv.put("time",startTime);
-                    String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-                    cv.put("date",date);
-                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                    scaled.compress(Bitmap.CompressFormat.PNG, 100, bos);
-                    byte[] bArray = bos.toByteArray();
-                    cv.put("image",bArray);
-                    db.insert("Photo",null,cv);
-                    //printDB();
+                        ContentValues cv = new ContentValues();
+                        cv.put("letter", l);
+                        cv.put("label", list.get(i).getKey());
+                        cv.put("time", startTime);
+                        String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+                        cv.put("date", date);
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        scaled.compress(Bitmap.CompressFormat.PNG, 100, bos);
+                        byte[] bArray = bos.toByteArray();
+                        cv.put("image", bArray);
+                        db.insert("Photo", null, cv);
 
-                    remaining.remove(currentIndex);
-                    mp = MediaPlayer.create(this,R.raw.applause);
-                    mp.start();
-                    scaleDown.end();
-                    //Log.v("mytag","W: "+currentButton.getWidth());
-                    currentButton.setBackground(new BitmapDrawable(getResources(), scaled));
-                    currentButton.setClickable(false);
-                    new java.util.Timer().schedule(
-                            new java.util.TimerTask() {
-                                @Override
-                                public void run() {
-                                    runOnUiThread(new   Runnable() {
-                                        public void run() {
-                                            selectRandomButton(1);
-                                            startTime=0;
-                                        }
-                                    });
-                                }
-                            },
-                            3000
-                    );
-                    return;
+                        remaining.remove(currentIndex);
+                        mp = MediaPlayer.create(this, R.raw.applause);
+                        mp.start();
+                        scaleDown.cancel();
+                        ((ViewGroup) currentButton.getParent()).removeView(currentButton);
+                        ImageView iv = (ImageView) inflatedView.findViewById(current + 100);
+                        iv.setImageBitmap(scaled);
+                        new java.util.Timer().schedule(
+                                new java.util.TimerTask() {
+                                    @Override
+                                    public void run() {
+                                        runOnUiThread(new Runnable() {
+                                            public void run() {
+                                                selectRandomButton(1);
+                                                startTime = 0;
+                                            }
+                                        });
+                                    }
+                                },
+                                3000
+                        );
+                        return;
+                    }
+                    if (i < 2) detection += list.get(i).getKey() + ", ";
+                    else detection += list.get(i).getKey();
                 }
             }
         }
+        TextView tv=(TextView) findViewById(R.id.detected_object);
+        tv.setText(detection);
         mp = MediaPlayer.create(this,R.raw.wrong_sound);
         mp.start();
+        scaleDown.start();
+    }
+
+    private boolean detectFake(List<Map.Entry<String, Float> > list){
+        String[] vir={"screen","television","laptop","computer","monitor"};
+        for(int i=0;i<10;i++){
+            if(list.get(i).getValue()>0){
+                Log.v("mytag", "key :" + list.get(i).getKey() + " Probability :" + list.get(i).getValue());
+                for(int j=0;j<vir.length;j++){
+                    if(list.get(i).getKey().toLowerCase().contains(vir[j])) return true;
+                }
+            }
+        }
+        return false;
     }
 
     public void printDB(){
@@ -395,5 +410,16 @@ public class GameActivity extends AppCompatActivity {
     public void exitGame(View view) {
         Intent i=new Intent(this,MainActivity.class);
         startActivity(i);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        float z=sensorEvent.values[0]*sensorEvent.values[0]+sensorEvent.values[1]*sensorEvent.values[1]+sensorEvent.values[2]*sensorEvent.values[2];
+        Log.d("sensor","x :"+sensorEvent.values[0]+" y :"+sensorEvent.values[1]+" z :"+sensorEvent.values[2]+" v :"+z);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
     }
 }

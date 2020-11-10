@@ -138,35 +138,6 @@ public class History extends AppCompatActivity {
                 ll.addView(ll2);
                 c.moveToNext();
             }
-            /*
-            for(int j=0;j<3;j++) {
-                LinearLayout ll2 = new LinearLayout(this);
-                ll2.setOrientation(LinearLayout.VERTICAL);
-                ImageView imageView1 = new ImageView(this);
-                Bitmap imageBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.cocmelon2);
-                Bitmap scaled = Bitmap.createScaledBitmap(imageBitmap, 200, 200, false);
-                imageView1.setImageBitmap(scaled);
-                ll2.addView(imageView1);
-
-                TextView label = new TextView(this);
-                label.setText("Label: ");
-                ll2.addView(label);
-
-                TextView time = new TextView(this);
-                time.setText("Time: ");
-                ll2.addView(time);
-
-                TextView takenAt = new TextView(this);
-                takenAt.setWidth(200);
-                //takenAt.setHeight(40);
-                String currentDateandTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-                takenAt.setText("Taken At: "+currentDateandTime);
-                ll2.addView(takenAt);
-
-                ll.addView(ll2);
-            }
-             */
-
             grid.addView(ll);
         }
     }

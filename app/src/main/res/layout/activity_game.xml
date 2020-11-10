@@ -9,6 +9,18 @@
     android:id="@+id/game_view"
     tools:context=".GameActivity">
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="20dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/colorPrimary"
+        android:fontFamily="casual"
+        android:textStyle="bold"
+        android:id="@+id/detected_object"
+        android:text="Detected object: "/>
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
