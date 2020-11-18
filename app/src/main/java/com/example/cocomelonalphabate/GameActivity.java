@@ -125,7 +125,7 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
         GridLayout grid = (GridLayout) inflatedView.findViewById(R.id.grid);
         createGrid(grid);
 
-        selectRandomButton(0);
+        selectRandomButton();
         startTimer();
 
         initTensorflow();
@@ -186,14 +186,13 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
-    private void selectRandomButton(int x1){
+    private void selectRandomButton(){
         if(remaining.size()==0) {
             showCongratulations();
             return;
         }
         Random random=new Random();
-        if (x1==0) currentIndex = 1;
-        else currentIndex=random.nextInt(remaining.size());
+        currentIndex=random.nextInt(remaining.size());
         current=remaining.get(currentIndex);
         currentButton=(Button) inflatedView.findViewById(current);
         currentTextView = (TextView) inflatedView.findViewById(1000+current);
@@ -375,7 +374,7 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
                                     public void run() {
                                         runOnUiThread(new Runnable() {
                                             public void run() {
-                                                selectRandomButton(1);
+                                                selectRandomButton();
                                                 startTime = 0;
                                             }
                                         });
