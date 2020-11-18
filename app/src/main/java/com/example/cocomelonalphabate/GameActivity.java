@@ -9,8 +9,10 @@ import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
@@ -93,6 +95,9 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
     ObjectAnimator scaleDown;
     SensorManager sm=null;
     Sensor s;
+    float totalAccelerometer=0;
+    int numAccelerometer=0;
+    float maxAccelerometer=0;
 
     protected Interpreter tflite;
     private MappedByteBuffer tfliteModel;
@@ -115,7 +120,6 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
         db = this.openOrCreateDatabase ("myDatabase", Context.MODE_PRIVATE, null);
         sm = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         s = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        sm.registerListener(this, s, 1000000);
         inflatedView = getLayoutInflater().inflate(R.layout.activity_game, null);
         LinearLayout gameView= (LinearLayout)  inflatedView.findViewById(R.id.game_view);
         GridLayout grid = (GridLayout) inflatedView.findViewById(R.id.grid);
@@ -183,6 +187,10 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void selectRandomButton(int x1){
+        if(remaining.size()==0) {
+            showCongratulations();
+            return;
+        }
         Random random=new Random();
         if (x1==0) currentIndex = 1;
         else currentIndex=random.nextInt(remaining.size());
@@ -191,13 +199,6 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
         currentTextView = (TextView) inflatedView.findViewById(1000+current);
         currentButton.setClickable(true);
         currentButton.setBackgroundColor(Color.parseColor("#94E78D"));
-
-//        scaleDown = ObjectAnimator.ofFloat(currentButton, "rotationY", 0.0f, 360f);
-//        scaleDown.setDuration(3600);
-//        scaleDown.setRepeatCount(ObjectAnimator.INFINITE);
-//        scaleDown.setInterpolator(new AccelerateDecelerateInterpolator());
-//        scaleDown.start();
-
 
         scaleDown = ObjectAnimator.ofPropertyValuesHolder(
                 currentButton,
@@ -209,17 +210,23 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
         scaleDown.setRepeatMode(ValueAnimator.REVERSE);
         scaleDown.start();
 
-//        blinkanimation= new AlphaAnimation(1, 0);
-//        blinkanimation.setDuration(1000);
-//        blinkanimation.setInterpolator(new LinearInterpolator());
-//        blinkanimation.setRepeatCount(Animation.INFINITE);
-//        blinkanimation.setRepeatMode(Animation.REVERSE);
-//        currentButton.setAnimation(blinkanimation);
-
         String recording_file = Character.toString((char)('A'+current)).toLowerCase();
         int x=getResources().getIdentifier(recording_file, "raw", getPackageName());
+        sm.registerListener(this, s, 2000000);
+        totalAccelerometer=0;
+        numAccelerometer=0;
+        maxAccelerometer=0;
         mp = MediaPlayer.create(this,x);
         mp.start();
+    }
+
+    private void showCongratulations(){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Congratulations !!!");
+        builder.setMessage("You have won.");
+        builder.setPositiveButton("OK", null);
+        AlertDialog dialog = builder.create();
+        dialog.show();
     }
 
 
@@ -355,6 +362,13 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
                         ((ViewGroup) currentButton.getParent()).removeView(currentButton);
                         ImageView iv = (ImageView) inflatedView.findViewById(current + 100);
                         iv.setImageBitmap(scaled);
+
+                        ObjectAnimator animation = ObjectAnimator.ofFloat(iv, "rotationY", 0.0f, 360f);
+                        animation.setDuration(3000);
+                        //animation.setRepeatCount(ObjectAnimator.INFINITE);
+                        animation.setInterpolator(new AccelerateDecelerateInterpolator());
+                        animation.start();
+
                         new java.util.Timer().schedule(
                                 new java.util.TimerTask() {
                                     @Override
@@ -376,6 +390,7 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
                 }
             }
         }
+
         TextView tv=(TextView) findViewById(R.id.detected_object);
         tv.setText(detection);
         mp = MediaPlayer.create(this,R.raw.wrong_sound);
@@ -383,6 +398,8 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
         scaleDown.start();
     }
 
+    // I used two checking methods for fake detection. First, whether top ten tag contains the name screen,television,laptop,computer,monitor. Second, whether
+    // the maximum accelerometer value exceed a threshold(100).
     private boolean detectFake(List<Map.Entry<String, Float> > list){
         String[] vir={"screen","television","laptop","computer","monitor"};
         for(int i=0;i<10;i++){
@@ -393,6 +410,8 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
                 }
             }
         }
+        Log.v("mytag","T :"+totalAccelerometer+" N :"+numAccelerometer+ " M: "+maxAccelerometer);
+        if(maxAccelerometer < 100) return true;
         return false;
     }
 
@@ -415,7 +434,10 @@ public class GameActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         float z=sensorEvent.values[0]*sensorEvent.values[0]+sensorEvent.values[1]*sensorEvent.values[1]+sensorEvent.values[2]*sensorEvent.values[2];
-        Log.d("sensor","x :"+sensorEvent.values[0]+" y :"+sensorEvent.values[1]+" z :"+sensorEvent.values[2]+" v :"+z);
+        Log.d("sensor","x :"+sensorEvent.values[0]+" y :"+sensorEvent.values[1]+" z :"+sensorEvent.values[2]+" z :"+z);
+        numAccelerometer++;
+        totalAccelerometer+=z;
+        if(z>maxAccelerometer) maxAccelerometer=z;
     }
 
     @Override
